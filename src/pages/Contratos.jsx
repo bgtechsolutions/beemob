@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
 import Badge from '../components/Badge'
+import CurrencyInput from '../components/CurrencyInput'
 import { toast } from '../components/Toast'
 import { validarDatas } from '../lib/validators'
 import { fmt } from '../lib/format'
@@ -25,6 +26,7 @@ export default function Contratos() {
   const [rows, setRows] = useState([])
   const [props, setProps] = useState([])
   const [inqs, setInqs] = useState([])
+  const [corretores, setCorretores] = useState([])
   const [q, setQ] = useState('')
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState(empty)
@@ -35,14 +37,16 @@ export default function Contratos() {
 
   async function load() {
     setLoading(true)
-    const [{ data: c }, { data: p }, { data: i }] = await Promise.all([
+    const [{ data: c }, { data: p }, { data: i }, { data: cor }] = await Promise.all([
       supabase.from('contratos').select('*, proprietarios(nome), inquilinos(nome)').order('created_at', { ascending: false }),
       supabase.from('proprietarios').select('id, nome').order('nome'),
       supabase.from('inquilinos').select('id, nome').order('nome'),
+      supabase.from('corretores').select('id, nome').order('nome'),
     ])
     setRows(c || [])
     setProps(p || [])
     setInqs(i || [])
+    setCorretores(cor || [])
     setLoading(false)
   }
 
@@ -197,23 +201,35 @@ export default function Contratos() {
             <input type="date" value={form.data_primeiro_aluguel} onChange={e => setForm(f => ({ ...f, data_primeiro_aluguel: e.target.value }))} className="input" />
           </Field>
           <Field label="Valor 1º Aluguel (R$)">
-            <input type="number" value={form.valor_primeiro_aluguel} onChange={e => setForm(f => ({ ...f, valor_primeiro_aluguel: e.target.value }))} className="input" />
+            <CurrencyInput value={form.valor_primeiro_aluguel} onChange={v => setForm(f => ({ ...f, valor_primeiro_aluguel: v }))} />
           </Field>
           <Field label="Valor Recorrente (R$)">
-            <input type="number" value={form.valor_recorrente} onChange={e => setForm(f => ({ ...f, valor_recorrente: e.target.value }))} className="input" />
+            <CurrencyInput value={form.valor_recorrente} onChange={v => setForm(f => ({ ...f, valor_recorrente: v }))} />
           </Field>
           <Field label="% Taxa Adm">
-            <input type="number" step="0.0001" value={form.percentual_taxa} onChange={e => setForm(f => ({ ...f, percentual_taxa: e.target.value }))} className="input" />
+            <div className="relative">
+              <input type="number" step="0.01" min="0" max="1" value={form.percentual_taxa} onChange={e => setForm(f => ({ ...f, percentual_taxa: e.target.value }))} className="input pr-8" />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">%</span>
+            </div>
           </Field>
 
           <Field label="Captador">
-            <input value={form.captador_nome} onChange={e => setForm(f => ({ ...f, captador_nome: e.target.value }))} className="input" />
+            <select value={form.captador_nome} onChange={e => setForm(f => ({ ...f, captador_nome: e.target.value }))} className="input">
+              <option value="">Selecione...</option>
+              {corretores.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+            </select>
           </Field>
           <Field label="Corretor">
-            <input value={form.corretor_nome} onChange={e => setForm(f => ({ ...f, corretor_nome: e.target.value }))} className="input" />
+            <select value={form.corretor_nome} onChange={e => setForm(f => ({ ...f, corretor_nome: e.target.value }))} className="input">
+              <option value="">Selecione...</option>
+              {corretores.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+            </select>
           </Field>
           <Field label="Gestor">
-            <input value={form.gestor_nome} onChange={e => setForm(f => ({ ...f, gestor_nome: e.target.value }))} className="input" />
+            <select value={form.gestor_nome} onChange={e => setForm(f => ({ ...f, gestor_nome: e.target.value }))} className="input">
+              <option value="">Selecione...</option>
+              {corretores.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+            </select>
           </Field>
 
           <Field label="Observações" className="md:col-span-2">

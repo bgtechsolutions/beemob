@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
+import CurrencyInput from '../components/CurrencyInput'
 import { toast } from '../components/Toast'
 import { validarCPF, validarEmail } from '../lib/validators'
 import { fmt } from '../lib/format'
@@ -21,6 +22,7 @@ const empty = {
 
 export default function Proprietarios() {
   const [rows, setRows] = useState([])
+  const [corretores, setCorretores] = useState([])
   const [q, setQ] = useState('')
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState(empty)
@@ -32,8 +34,12 @@ export default function Proprietarios() {
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase.from('proprietarios').select('*').order('nome')
-    setRows(data || [])
+    const [{ data: p }, { data: c }] = await Promise.all([
+      supabase.from('proprietarios').select('*').order('nome'),
+      supabase.from('corretores').select('id, nome').order('nome'),
+    ])
+    setRows(p || [])
+    setCorretores(c || [])
     setLoading(false)
   }
 
@@ -170,12 +176,22 @@ export default function Proprietarios() {
             <F label="Cidade/UF Imóvel"><input {...f('cidade_uf_imovel')} className="input" /></F>
             <F label="Inscrição Municipal"><input {...f('inscricao_municipal')} className="input" /></F>
             <F label="Administradora Condomínio"><input {...f('administradora')} className="input" /></F>
-            <F label="Valor Aluguel (R$)"><input type="number" {...f('valor_aluguel')} className="input" /></F>
-            <F label="Valor Condomínio (R$)"><input type="number" {...f('valor_condominio')} className="input" /></F>
-            <F label="Taxas Extras Cond. (R$)"><input type="number" {...f('taxas_extras_cond')} className="input" /></F>
-            <F label="Valor IPTU (R$)"><input type="number" {...f('valor_iptu')} className="input" /></F>
-            <F label="Dia Vencto Condomínio"><input type="number" {...f('dia_vencto_condominio')} className="input" /></F>
-            <F label="Taxas Extras (R$)"><input type="number" {...f('taxas_extras')} className="input" /></F>
+            <F label="Valor Aluguel (R$)">
+              <CurrencyInput value={form.valor_aluguel} onChange={v => setForm(p => ({ ...p, valor_aluguel: v }))} />
+            </F>
+            <F label="Valor Condomínio (R$)">
+              <CurrencyInput value={form.valor_condominio} onChange={v => setForm(p => ({ ...p, valor_condominio: v }))} />
+            </F>
+            <F label="Taxas Extras Cond. (R$)">
+              <CurrencyInput value={form.taxas_extras_cond} onChange={v => setForm(p => ({ ...p, taxas_extras_cond: v }))} />
+            </F>
+            <F label="Valor IPTU (R$)">
+              <CurrencyInput value={form.valor_iptu} onChange={v => setForm(p => ({ ...p, valor_iptu: v }))} />
+            </F>
+            <F label="Dia Vencto Condomínio"><input type="number" min="1" max="31" {...f('dia_vencto_condominio')} className="input" /></F>
+            <F label="Taxas Extras (R$)">
+              <CurrencyInput value={form.taxas_extras} onChange={v => setForm(p => ({ ...p, taxas_extras: v }))} />
+            </F>
           </div>
         )}
 
@@ -185,16 +201,41 @@ export default function Proprietarios() {
             <F label="Agência"><input {...f('agencia')} className="input" /></F>
             <F label="Conta Corrente"><input {...f('conta_corrente')} className="input" /></F>
             <F label="PIX"><input {...f('pix')} className="input" /></F>
-            <F label="% Taxa Adm Beemob"><input type="number" step="0.0001" {...f('percentual_taxa_adm')} className="input" /></F>
-            <F label="Honorário Adm 1º Aluguel (R$)"><input type="number" {...f('honorario_adm_primeiro')} className="input" /></F>
+            <F label="% Taxa Adm Beemob">
+              <div className="relative">
+                <input type="number" step="0.01" min="0" max="1" {...f('percentual_taxa_adm')} className="input pr-8" />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">%</span>
+              </div>
+            </F>
+            <F label="Honorário Adm 1º Aluguel (R$)">
+              <CurrencyInput value={form.honorario_adm_primeiro} onChange={v => setForm(p => ({ ...p, honorario_adm_primeiro: v }))} />
+            </F>
           </div>
         )}
 
         {tab === 'comissao' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <F label="Captador"><input {...f('captador_nome')} className="input" /></F>
-            <F label="Corretor"><input {...f('corretor_nome')} className="input" /></F>
-            <F label="Gestor"><input {...f('gestor_nome')} className="input" /></F>
+            <F label="Captador">
+              <select {...f('captador_nome')} className="input">
+                <option value="">Selecione...</option>
+                {corretores.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                <option value="__outro">Outro (digitar)</option>
+              </select>
+            </F>
+            <F label="Corretor">
+              <select {...f('corretor_nome')} className="input">
+                <option value="">Selecione...</option>
+                {corretores.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                <option value="__outro">Outro (digitar)</option>
+              </select>
+            </F>
+            <F label="Gestor">
+              <select {...f('gestor_nome')} className="input">
+                <option value="">Selecione...</option>
+                {corretores.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                <option value="__outro">Outro (digitar)</option>
+              </select>
+            </F>
           </div>
         )}
 

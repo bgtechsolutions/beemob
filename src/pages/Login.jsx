@@ -62,7 +62,8 @@ export default function Login() {
                   onChange={e => setEmail(e.target.value)}
                   placeholder="seu@email.com"
                   required
-                  className="input pl-9 w-full"
+                  className="input w-full"
+                  style={{ paddingLeft: '2.25rem' }}
                   autoComplete="email"
                 />
               </div>
@@ -80,7 +81,8 @@ export default function Login() {
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="input pl-9 pr-10 w-full"
+                  className="input w-full"
+                  style={{ paddingLeft: '2.25rem', paddingRight: '2.5rem' }}
                   autoComplete="current-password"
                 />
                 <button
