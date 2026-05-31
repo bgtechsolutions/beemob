@@ -36,7 +36,7 @@ export default function Proprietarios() {
     setLoading(true)
     const [{ data: p }, { data: c }] = await Promise.all([
       supabase.from('proprietarios').select('*').order('nome'),
-      supabase.from('corretores').select('id, nome').order('nome'),
+      supabase.from('corretores').select('id, nome, tipo').order('nome'),
     ])
     setRows(p || [])
     setCorretores(c || [])
@@ -219,21 +219,20 @@ export default function Proprietarios() {
               <select {...f('captador_nome')} className="input">
                 <option value="">Selecione...</option>
                 {corretores.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-                <option value="__outro">Outro (digitar)</option>
               </select>
             </F>
             <F label="Corretor">
               <select {...f('corretor_nome')} className="input">
                 <option value="">Selecione...</option>
                 {corretores.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-                <option value="__outro">Outro (digitar)</option>
               </select>
             </F>
             <F label="Gestor">
               <select {...f('gestor_nome')} className="input">
                 <option value="">Selecione...</option>
-                {corretores.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-                <option value="__outro">Outro (digitar)</option>
+                {corretores
+                  .filter(c => c.tipo === 'gestor' || c.tipo === 'corretor_gestor')
+                  .map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
               </select>
             </F>
           </div>

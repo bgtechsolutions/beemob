@@ -5,7 +5,19 @@ import Modal from '../components/Modal'
 import { toast } from '../components/Toast'
 import { Plus, Search, Edit2, Trash2 } from 'lucide-react'
 
-const empty = { id: '', nome: '', creci: '', rg: '', cpf: '', endereco: '', telefone: '' }
+const empty = { id: '', nome: '', creci: '', rg: '', cpf: '', endereco: '', telefone: '', tipo: 'corretor' }
+
+const tipoLabel = {
+  corretor: 'Corretor',
+  gestor: 'Gestor',
+  corretor_gestor: 'Corretor e Gestor',
+}
+
+const tipoBadge = {
+  corretor: 'bg-blue-50 text-blue-700',
+  gestor: 'bg-purple-50 text-purple-700',
+  corretor_gestor: 'bg-emerald-50 text-emerald-700',
+}
 
 export default function Corretores() {
   const [rows, setRows] = useState([])
@@ -60,6 +72,11 @@ export default function Corretores() {
   const cols = [
     { key: 'id', label: 'ID' },
     { key: 'nome', label: 'Nome' },
+    { key: 'tipo', label: 'Tipo', render: (v) => (
+      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tipoBadge[v] || tipoBadge.corretor}`}>
+        {tipoLabel[v] || 'Corretor'}
+      </span>
+    )},
     { key: 'creci', label: 'CRECI' },
     { key: 'cpf', label: 'CPF' },
     { key: 'telefone', label: 'Telefone' },
@@ -96,6 +113,23 @@ export default function Corretores() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <F label="ID" required><input {...f('id')} disabled={form._editing} className="input" placeholder="B-0015" /></F>
           <F label="Nome completo" required><input {...f('nome')} className="input" /></F>
+
+          <F label="Tipo" required>
+            <select {...f('tipo')} className="input">
+              <option value="corretor">Corretor</option>
+              <option value="gestor">Gestor</option>
+              <option value="corretor_gestor">Corretor e Gestor</option>
+            </select>
+          </F>
+
+          {/* Aviso visual quando é gestor */}
+          {(form.tipo === 'gestor' || form.tipo === 'corretor_gestor') && (
+            <div className="flex items-start gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-700 md:col-span-1">
+              <span className="mt-0.5">👤</span>
+              <span>Este profissional aparecerá como opção de <strong>Gestor</strong> nos contratos e imóveis.</span>
+            </div>
+          )}
+
           <F label="CRECI"><input {...f('creci')} className="input" /></F>
           <F label="CPF"><input {...f('cpf')} className="input" /></F>
           <F label="RG"><input {...f('rg')} className="input" /></F>

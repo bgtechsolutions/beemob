@@ -41,7 +41,7 @@ export default function Contratos() {
       supabase.from('contratos').select('*, proprietarios(nome), inquilinos(nome)').order('created_at', { ascending: false }),
       supabase.from('proprietarios').select('id, nome').order('nome'),
       supabase.from('inquilinos').select('id, nome').order('nome'),
-      supabase.from('corretores').select('id, nome').order('nome'),
+      supabase.from('corretores').select('id, nome, tipo').order('nome'),
     ])
     setRows(c || [])
     setProps(p || [])
@@ -228,7 +228,9 @@ export default function Contratos() {
           <Field label="Gestor">
             <select value={form.gestor_nome} onChange={e => setForm(f => ({ ...f, gestor_nome: e.target.value }))} className="input">
               <option value="">Selecione...</option>
-              {corretores.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+              {corretores
+                .filter(c => c.tipo === 'gestor' || c.tipo === 'corretor_gestor')
+                .map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
             </select>
           </Field>
 
