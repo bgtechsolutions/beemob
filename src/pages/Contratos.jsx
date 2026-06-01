@@ -67,15 +67,16 @@ export default function Contratos() {
     if (!form.inquilino_id) return toast('Selecione o inquilino.', 'error')
     if (!validarDatas(form.data_inicio, form.data_fim)) return toast('Data fim deve ser posterior à data início.', 'error')
     setSaving(true)
+    const { _editing, ...rest } = form
     const data = {
-      ...form,
-      valor_primeiro_aluguel: parseFloat(form.valor_primeiro_aluguel) || 0,
-      valor_recorrente: parseFloat(form.valor_recorrente) || 0,
-      percentual_taxa: parseFloat(form.percentual_taxa) || 0.10,
+      ...rest,
+      valor_primeiro_aluguel: parseFloat(rest.valor_primeiro_aluguel) || 0,
+      valor_recorrente: parseFloat(rest.valor_recorrente) || 0,
+      percentual_taxa: parseFloat(rest.percentual_taxa) || 0.10,
     }
     try {
-      const { error } = form._editing
-        ? await supabase.from('contratos').update(data).eq('id', form.id)
+      const { error } = _editing
+        ? await supabase.from('contratos').update(data).eq('id', data.id)
         : await supabase.from('contratos').insert(data)
       if (error) throw error
       toast(form._editing ? 'Contrato atualizado!' : 'Contrato criado!', 'success')

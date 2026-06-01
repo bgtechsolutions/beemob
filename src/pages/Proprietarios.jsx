@@ -56,19 +56,20 @@ export default function Proprietarios() {
     if (form.cpf && !validarCPF(form.cpf)) return toast('CPF inválido.', 'error')
     if (form.email && !validarEmail(form.email)) return toast('E-mail inválido.', 'error')
     setSaving(true)
+    const { _editing, ...rest } = form
     const data = {
-      ...form,
-      valor_aluguel: parseFloat(form.valor_aluguel) || 0,
-      valor_condominio: parseFloat(form.valor_condominio) || 0,
-      taxas_extras_cond: parseFloat(form.taxas_extras_cond) || 0,
-      valor_iptu: parseFloat(form.valor_iptu) || 0,
-      taxas_extras: parseFloat(form.taxas_extras) || 0,
-      percentual_taxa_adm: parseFloat(form.percentual_taxa_adm) || 0.10,
-      honorario_adm_primeiro: parseFloat(form.honorario_adm_primeiro) || 0,
+      ...rest,
+      valor_aluguel: parseFloat(rest.valor_aluguel) || 0,
+      valor_condominio: parseFloat(rest.valor_condominio) || 0,
+      taxas_extras_cond: parseFloat(rest.taxas_extras_cond) || 0,
+      valor_iptu: parseFloat(rest.valor_iptu) || 0,
+      taxas_extras: parseFloat(rest.taxas_extras) || 0,
+      percentual_taxa_adm: parseFloat(rest.percentual_taxa_adm) || 0.10,
+      honorario_adm_primeiro: parseFloat(rest.honorario_adm_primeiro) || 0,
     }
     try {
-      const { error } = form._editing
-        ? await supabase.from('proprietarios').update(data).eq('id', form.id)
+      const { error } = _editing
+        ? await supabase.from('proprietarios').update(data).eq('id', data.id)
         : await supabase.from('proprietarios').insert(data)
       if (error) throw error
       toast(form._editing ? 'Proprietário atualizado!' : 'Proprietário cadastrado!', 'success')

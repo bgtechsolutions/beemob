@@ -44,9 +44,10 @@ export default function Corretores() {
     if (!form.nome.trim()) return toast('Nome é obrigatório.', 'error')
     setSaving(true)
     try {
-      const { error } = form._editing
-        ? await supabase.from('corretores').update({ ...form }).eq('id', form.id)
-        : await supabase.from('corretores').insert({ ...form })
+      const { _editing, ...data } = form
+      const { error } = _editing
+        ? await supabase.from('corretores').update(data).eq('id', data.id)
+        : await supabase.from('corretores').insert(data)
       if (error) throw error
       toast(form._editing ? 'Corretor atualizado!' : 'Corretor cadastrado!', 'success')
       setModal(false)
