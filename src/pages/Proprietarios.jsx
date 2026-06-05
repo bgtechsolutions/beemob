@@ -66,6 +66,7 @@ export default function Proprietarios() {
       taxas_extras: parseFloat(rest.taxas_extras) || 0,
       percentual_taxa_adm: parseFloat(rest.percentual_taxa_adm) || 0.10,
       honorario_adm_primeiro: parseFloat(rest.honorario_adm_primeiro) || 0,
+      dia_vencto_condominio: rest.dia_vencto_condominio !== '' ? parseInt(rest.dia_vencto_condominio) : null,
     }
     try {
       const { error } = _editing
