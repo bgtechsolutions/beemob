@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
+import ConfirmModal from '../components/ConfirmModal'
 import CurrencyInput from '../components/CurrencyInput'
 import { toast } from '../components/Toast'
 import { validarCPF, validarEmail } from '../lib/validators'
 import { fmt } from '../lib/format'
+import { maskCPF, maskTelefone, maskCEP, buscarCEP } from '../lib/masks'
 import { Plus, Search, Edit2, Trash2 } from 'lucide-react'
 
 const empty = {
@@ -29,6 +31,7 @@ export default function Proprietarios() {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('geral')
+  const [confirmDelete, setConfirmDelete] = useState(null)
 
   useEffect(() => { load() }, [])
 
@@ -85,9 +88,20 @@ export default function Proprietarios() {
   }
 
   async function remove(id) {
-    if (!confirm('Excluir este proprietário?')) return
-    await supabase.from('proprietarios').delete().eq('id', id)
+    const { error } = await supabase.from('proprietarios').delete().eq('id', id)
+    if (error) { toast('Não é possível excluir: existem registros vinculados.', 'error'); return }
+    toast('Proprietário excluído.', 'warning')
     load()
+  }
+
+  async function handleCEPProprietario(cep) {
+    const dados = await buscarCEP(cep)
+    if (dados) setForm(p => ({ ...p, cidade_uf_proprietario: dados.cidade_uf, endereco_proprietario: p.endereco_proprietario || dados.endereco }))
+  }
+
+  async function handleCEPImovel(cep) {
+    const dados = await buscarCEP(cep)
+    if (dados) setForm(p => ({ ...p, cidade_uf_imovel: dados.cidade_uf, endereco_imovel: p.endereco_imovel || dados.endereco }))
   }
 
   const filtered = rows.filter(r =>
@@ -106,7 +120,7 @@ export default function Proprietarios() {
     { key: '_actions', label: '', render: (_, row) => (
       <div className="flex gap-1" onClick={e => e.stopPropagation()}>
         <button onClick={() => openEdit({ ...row, _editing: true })} className="p-1.5 rounded hover:bg-slate-100 text-slate-500"><Edit2 size={14} /></button>
-        <button onClick={() => remove(row.id)} className="p-1.5 rounded hover:bg-red-50 text-red-400"><Trash2 size={14} /></button>
+        <button onClick={() => setConfirmDelete(row)} className="p-1.5 rounded hover:bg-red-50 text-red-400"><Trash2 size={14} /></button>
       </div>
     )},
   ]
@@ -139,6 +153,12 @@ export default function Proprietarios() {
       {loading ? <div className="flex justify-center py-12"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
         : <Table columns={cols} data={filtered} onRowClick={(r) => openEdit({ ...r, _editing: true })} />}
 
+      <ConfirmModal open={!!confirmDelete} onClose={() => setConfirmDelete(null)}
+        onConfirm={() => remove(confirmDelete?.id)} danger
+        title="Excluir Proprietário"
+        message={`Tem certeza que deseja excluir "${confirmDelete?.nome}"? Esta ação não pode ser desfeita.`}
+        confirmLabel="Excluir" />
+
       <Modal open={modal} onClose={() => setModal(false)} title={form._editing ? 'Editar Proprietário' : 'Novo Proprietário'} size="xl">
         <div className="flex gap-1 mb-5 border-b border-slate-200 pb-2">
           {tabs.map(t => (
@@ -153,7 +173,9 @@ export default function Proprietarios() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <F label="ID (código do imóvel)" required><input {...f('id')} disabled={form._editing} className="input" placeholder="2025-001" /></F>
             <F label="Nome completo" required><input {...f('nome')} className="input" /></F>
-            <F label="CPF"><input {...f('cpf')} className="input" /></F>
+            <F label="CPF">
+              <input value={form.cpf || ''} onChange={e => setForm(p => ({ ...p, cpf: maskCPF(e.target.value) }))} className="input" placeholder="000.000.000-00" />
+            </F>
             <F label="RG"><input {...f('rg')} className="input" /></F>
             <F label="Órgão Emissor"><input {...f('orgao_emissor')} className="input" /></F>
             <F label="Data Nascimento"><input type="date" {...f('data_nasc')} className="input" /></F>
@@ -164,10 +186,15 @@ export default function Proprietarios() {
                 {['Solteiro','Casado','Divorciado','Viúvo','União Estável'].map(v => <option key={v}>{v}</option>)}
               </select>
             </F>
-            <F label="Telefone"><input {...f('telefone')} className="input" /></F>
+            <F label="Telefone">
+              <input value={form.telefone || ''} onChange={e => setForm(p => ({ ...p, telefone: maskTelefone(e.target.value) }))} className="input" placeholder="(67) 99999-9999" />
+            </F>
             <F label="E-mail"><input type="email" {...f('email')} className="input" /></F>
             <F label="Endereço Proprietário" className="md:col-span-2"><input {...f('endereco_proprietario')} className="input" /></F>
-            <F label="CEP"><input {...f('cep_proprietario')} className="input" /></F>
+            <F label="CEP">
+              <input value={form.cep_proprietario || ''} onChange={e => setForm(p => ({ ...p, cep_proprietario: maskCEP(e.target.value) }))}
+                onBlur={e => handleCEPProprietario(e.target.value)} className="input" placeholder="00000-000" />
+            </F>
             <F label="Cidade/UF"><input {...f('cidade_uf_proprietario')} className="input" /></F>
           </div>
         )}
@@ -175,7 +202,10 @@ export default function Proprietarios() {
         {tab === 'imovel' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <F label="Endereço Imóvel" className="md:col-span-2"><input {...f('endereco_imovel')} className="input" /></F>
-            <F label="CEP Imóvel"><input {...f('cep_imovel')} className="input" /></F>
+            <F label="CEP Imóvel">
+              <input value={form.cep_imovel || ''} onChange={e => setForm(p => ({ ...p, cep_imovel: maskCEP(e.target.value) }))}
+                onBlur={e => handleCEPImovel(e.target.value)} className="input" placeholder="00000-000" />
+            </F>
             <F label="Cidade/UF Imóvel"><input {...f('cidade_uf_imovel')} className="input" /></F>
             <F label="Inscrição Municipal"><input {...f('inscricao_municipal')} className="input" /></F>
             <F label="Administradora Condomínio"><input {...f('administradora')} className="input" /></F>

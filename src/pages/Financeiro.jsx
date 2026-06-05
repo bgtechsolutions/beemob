@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
+import ConfirmModal from '../components/ConfirmModal'
 import Badge from '../components/Badge'
 import { toast } from '../components/Toast'
 import { fmt, fmtDate } from '../lib/format'
-import { Plus, Search, FileDown, CheckCircle, Package, Edit2 } from 'lucide-react'
+import { Plus, Search, FileDown, CheckCircle, Package, Edit2, Download, Zap } from 'lucide-react'
 import { differenceInDays, getDaysInMonth } from 'date-fns'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -33,6 +34,9 @@ export default function Financeiro() {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [gerandoLote, setGerandoLote] = useState(false)
+  const [gerandoMes, setGerandoMes] = useState(false)
+  const [filtroMes, setFiltroMes] = useState(new Date().toISOString().slice(0, 7))
+  const [confirmPago, setConfirmPago] = useState(null)
 
   useEffect(() => { load() }, [])
 
@@ -167,6 +171,83 @@ export default function Financeiro() {
     load()
   }
 
+  async function gerarLancamentosMes() {
+    setGerandoMes(true)
+    try {
+      const hoje = new Date()
+      const mesAtual = hoje.toISOString().slice(0, 7)
+      const inicioPeriodo = `${mesAtual}-01`
+      const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate()
+      const fimPeriodo = `${mesAtual}-${String(ultimoDia).padStart(2, '0')}`
+
+      const { data: existentes } = await supabase
+        .from('lancamentos').select('contrato_id')
+        .gte('periodo_inicio', inicioPeriodo).lte('periodo_inicio', fimPeriodo)
+      const jaExistem = new Set((existentes || []).map(l => l.contrato_id))
+
+      const contratosSemLancamento = contratos.filter(c => !jaExistem.has(c.id))
+      if (contratosSemLancamento.length === 0) {
+        toast('Todos os contratos já têm lançamento neste mês!', 'warning')
+        setGerandoMes(false); return
+      }
+
+      const novos = contratosSemLancamento.map(c => {
+        const prop = c.proprietarios
+        const aluguel = c.valor_recorrente || 0
+        const taxa = prop?.percentual_taxa_adm ?? c.percentual_taxa ?? 0.10
+        const taxaAdm = aluguel * taxa
+        return {
+          contrato_id: c.id,
+          periodo_inicio: inicioPeriodo,
+          periodo_fim: fimPeriodo,
+          e_primeiro_mes: false,
+          dias_periodo: ultimoDia,
+          valor_aluguel: aluguel,
+          valor_condominio: prop?.valor_condominio || 0,
+          taxas_extras_cond: prop?.taxas_extras_cond || 0,
+          valor_iptu: prop?.valor_iptu || 0,
+          despesas_manutencao: 0, multa: 0, juros: 0,
+          subtotal_inquilino: aluguel + (prop?.valor_condominio || 0) + (prop?.taxas_extras_cond || 0) + (prop?.valor_iptu || 0),
+          valor_liquido_inquilino: aluguel + (prop?.valor_condominio || 0) + (prop?.taxas_extras_cond || 0) + (prop?.valor_iptu || 0),
+          taxa_adm_imobiliaria: taxaAdm,
+          valor_repasse_proprietario: aluguel - taxaAdm,
+          status_pagamento: 'pendente',
+        }
+      })
+
+      const { error } = await supabase.from('lancamentos').insert(novos)
+      if (error) throw error
+      toast(`${novos.length} lançamento(s) gerado(s) para ${mesAtual}!`)
+      load()
+    } catch (e) {
+      toast(e.message || 'Erro ao gerar lançamentos', 'error')
+    } finally {
+      setGerandoMes(false)
+    }
+  }
+
+  function exportarCSV() {
+    const header = ['Contrato','Inquilino','Período Início','Período Fim','A Receber','A Repassar','Taxa Adm','Status','Data Pagamento']
+    const linhas = filtered.map(r => [
+      r.contrato_id,
+      r.contratos?.inquilinos?.nome || '',
+      r.periodo_inicio || '',
+      r.periodo_fim || '',
+      r.valor_liquido_inquilino || 0,
+      r.valor_repasse_proprietario || 0,
+      r.taxa_adm_imobiliaria || 0,
+      r.status_pagamento || '',
+      r.data_pagamento || '',
+    ])
+    const csv = [header, ...linhas].map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url
+    a.download = `financeiro_${filtroMes || 'todos'}.csv`
+    a.click(); URL.revokeObjectURL(url)
+    toast('CSV exportado!')
+  }
+
   function gerarPDF(row, tipo = 'inquilino') {
     const doc = new jsPDF()
     const contrato = row.contratos
@@ -281,7 +362,8 @@ export default function Financeiro() {
       r.contratos?.inquilinos?.nome?.toLowerCase().includes(txt) ||
       r.contratos?.proprietarios?.nome?.toLowerCase().includes(txt)
     const matchS = !filtroStatus || r.status_pagamento === filtroStatus
-    return matchQ && matchS
+    const matchM = !filtroMes || r.periodo_inicio?.startsWith(filtroMes) || r.periodo_fim?.startsWith(filtroMes)
+    return matchQ && matchS && matchM
   })
 
   const cols = [
@@ -297,7 +379,7 @@ export default function Financeiro() {
         <button onClick={() => openEdit(row)} title="Editar lançamento"
           className="p-1.5 rounded hover:bg-slate-100 text-slate-500"><Edit2 size={14} /></button>
         {row.status_pagamento !== 'pago' && (
-          <button onClick={() => marcarPago(row.id)} title="Marcar pago"
+          <button onClick={() => setConfirmPago(row.id)} title="Marcar pago"
             className="p-1.5 rounded hover:bg-green-50 text-green-500"><CheckCircle size={14} /></button>
         )}
         <button onClick={() => gerarPDF(row, 'inquilino')} title="Recibo Inquilino"
@@ -321,14 +403,23 @@ export default function Financeiro() {
             {rows.length} lançamentos · {rows.filter(r => r.status_pagamento === 'pendente').length} pendentes · {rows.filter(r => r.status_pagamento === 'atrasado').length} atrasados
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={gerarLancamentosMes} disabled={gerandoMes}
+            title="Gera automaticamente lançamentos para todos os contratos ativos que ainda não têm lançamento neste mês"
+            className="flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
+            <Zap size={15} className="text-yellow-500" /> {gerandoMes ? 'Gerando...' : 'Gerar lançamentos do mês'}
+          </button>
           <button onClick={gerarLote} disabled={gerandoLote}
-            className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
-            <Package size={16} /> {gerandoLote ? 'Gerando...' : 'Gerar recibos do mês'}
+            className="flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
+            <Package size={15} /> {gerandoLote ? 'Gerando...' : 'Recibos em lote'}
+          </button>
+          <button onClick={exportarCSV}
+            className="flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">
+            <Download size={15} /> Exportar CSV
           </button>
           <button onClick={openNew}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-            <Plus size={16} /> Novo Lançamento
+            <Plus size={16} /> Novo
           </button>
         </div>
       </div>
@@ -339,6 +430,11 @@ export default function Financeiro() {
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar contrato, inquilino..."
             className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
+        <input type="month" value={filtroMes} onChange={e => setFiltroMes(e.target.value)}
+          className="px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+        <button onClick={() => setFiltroMes('')} className="px-3 py-2.5 text-sm text-slate-400 hover:text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
+          Todos os meses
+        </button>
         <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}
           className="px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
           <option value="">Todos os status</option>
@@ -353,7 +449,14 @@ export default function Financeiro() {
         : <Table columns={cols} data={filtered} />
       }
 
-      <Modal open={modal} onClose={() => setModal(false)} title="Novo Lançamento" size="lg">
+      <ConfirmModal open={!!confirmPago} onClose={() => setConfirmPago(null)}
+        onConfirm={() => marcarPago(confirmPago)}
+        title="Confirmar pagamento"
+        message="Marcar este lançamento como pago? A data de hoje será registrada."
+        confirmLabel="Confirmar pagamento" />
+
+      <Modal open={modal} onClose={() => setModal(false)}
+        title={form._id ? 'Editar Lançamento' : 'Novo Lançamento'} size="lg">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
             <label className="block text-xs font-medium text-slate-600 mb-1">Contrato *</label>

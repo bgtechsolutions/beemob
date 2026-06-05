@@ -4,11 +4,12 @@ import Table from '../components/Table'
 import Modal from '../components/Modal'
 import Badge from '../components/Badge'
 import CurrencyInput from '../components/CurrencyInput'
+import ConfirmModal from '../components/ConfirmModal'
 import { toast } from '../components/Toast'
 import { validarDatas } from '../lib/validators'
 import { fmt } from '../lib/format'
-import { Plus, Search, Edit2, Trash2 } from 'lucide-react'
-import { format, differenceInDays } from 'date-fns'
+import { Plus, Search, Edit2, Trash2, RefreshCw } from 'lucide-react'
+import { format, differenceInDays, addYears } from 'date-fns'
 
 const statusVariant = { ativo: 'green', encerrado: 'gray', suspenso: 'yellow' }
 
@@ -28,6 +29,8 @@ export default function Contratos() {
   const [inqs, setInqs] = useState([])
   const [corretores, setCorretores] = useState([])
   const [q, setQ] = useState('')
+  const [filtroStatus, setFiltroStatus] = useState('ativo')
+  const [confirmDelete, setConfirmDelete] = useState(null)
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState(empty)
   const [saving, setSaving] = useState(false)
@@ -39,7 +42,7 @@ export default function Contratos() {
     setLoading(true)
     const [{ data: c }, { data: p }, { data: i }, { data: cor }] = await Promise.all([
       supabase.from('contratos').select('*, proprietarios(nome), inquilinos(nome)').order('created_at', { ascending: false }),
-      supabase.from('proprietarios').select('id, nome').order('nome'),
+      supabase.from('proprietarios').select('id, nome, endereco_imovel').order('nome'),
       supabase.from('inquilinos').select('id, nome').order('nome'),
       supabase.from('corretores').select('id, nome, tipo').order('nome'),
     ])
@@ -90,17 +93,41 @@ export default function Contratos() {
   }
 
   async function remove(id) {
-    if (!confirm('Excluir este contrato?')) return
-    await supabase.from('contratos').delete().eq('id', id)
+    const { error } = await supabase.from('contratos').delete().eq('id', id)
+    if (error) { toast('Não é possível excluir: existem lançamentos vinculados.', 'error'); return }
+    toast('Contrato excluído.', 'warning')
     load()
   }
 
-  const filtered = rows.filter(r =>
-    r.id?.toLowerCase().includes(q.toLowerCase()) ||
-    r.proprietarios?.nome?.toLowerCase().includes(q.toLowerCase()) ||
-    r.inquilinos?.nome?.toLowerCase().includes(q.toLowerCase()) ||
-    r.localizacao?.toLowerCase().includes(q.toLowerCase())
-  )
+  function renovar(row) {
+    const novoInicio = row.data_fim || new Date().toISOString().slice(0, 10)
+    const novoFim = addYears(new Date(novoInicio), 1).toISOString().slice(0, 10)
+    setForm({
+      ...empty,
+      proprietario_id: row.proprietario_id,
+      inquilino_id: row.inquilino_id,
+      localizacao: row.localizacao,
+      valor_recorrente: row.valor_recorrente,
+      percentual_taxa: row.percentual_taxa,
+      captador_nome: row.captador_nome || '',
+      corretor_nome: row.corretor_nome || '',
+      gestor_nome: row.gestor_nome || '',
+      data_inicio: novoInicio,
+      data_fim: novoFim,
+      status: 'ativo',
+    })
+    setModal(true)
+  }
+
+  const filtered = rows.filter(r => {
+    const txt = q.toLowerCase()
+    const matchQ = !q || r.id?.toLowerCase().includes(txt) ||
+      r.proprietarios?.nome?.toLowerCase().includes(txt) ||
+      r.inquilinos?.nome?.toLowerCase().includes(txt) ||
+      r.localizacao?.toLowerCase().includes(txt)
+    const matchS = !filtroStatus || r.status === filtroStatus
+    return matchQ && matchS
+  })
 
   const today = new Date()
   const cols = [
@@ -124,7 +151,9 @@ export default function Contratos() {
         <button onClick={() => openEdit({ ...row, _editing: true })} className="p-1.5 rounded hover:bg-slate-100 text-slate-500">
           <Edit2 size={14} />
         </button>
-        <button onClick={() => remove(row.id)} className="p-1.5 rounded hover:bg-red-50 text-red-400">
+        <button onClick={() => renovar(row)} title="Renovar contrato"
+          className="p-1.5 rounded hover:bg-green-50 text-green-500"><RefreshCw size={14} /></button>
+        <button onClick={() => setConfirmDelete(row)} className="p-1.5 rounded hover:bg-red-50 text-red-400">
           <Trash2 size={14} />
         </button>
       </div>
@@ -143,13 +172,20 @@ export default function Contratos() {
         </button>
       </div>
 
-      <div className="relative">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input
-          value={q} onChange={e => setQ(e.target.value)}
-          placeholder="Buscar por contrato, proprietário, inquilino ou endereço..."
-          className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      <div className="flex gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-48">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input value={q} onChange={e => setQ(e.target.value)}
+            placeholder="Buscar por contrato, proprietário, inquilino ou endereço..."
+            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}
+          className="px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+          <option value="">Todos os status</option>
+          <option value="ativo">Ativo</option>
+          <option value="encerrado">Encerrado</option>
+          <option value="suspenso">Suspenso</option>
+        </select>
       </div>
 
       {loading ? (
@@ -157,6 +193,12 @@ export default function Contratos() {
       ) : (
         <Table columns={cols} data={filtered} />
       )}
+
+      <ConfirmModal open={!!confirmDelete} onClose={() => setConfirmDelete(null)}
+        onConfirm={() => remove(confirmDelete?.id)} danger
+        title="Excluir Contrato"
+        message={`Excluir contrato "${confirmDelete?.id}"? Lançamentos vinculados impedirão a exclusão.`}
+        confirmLabel="Excluir" />
 
       <Modal open={modal} onClose={() => setModal(false)} title={form._editing ? 'Editar Contrato' : 'Novo Contrato'} size="lg">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -175,7 +217,11 @@ export default function Contratos() {
           </Field>
 
           <Field label="Proprietário" required>
-            <select value={form.proprietario_id} onChange={e => setForm(f => ({ ...f, proprietario_id: e.target.value }))} className="input">
+            <select value={form.proprietario_id} onChange={e => {
+              const pid = e.target.value
+              const prop = props.find(p => p.id === pid)
+              setForm(f => ({ ...f, proprietario_id: pid, localizacao: f.localizacao || prop?.endereco_imovel || '' }))
+            }} className="input">
               <option value="">Selecione...</option>
               {props.map(p => <option key={p.id} value={p.id}>{p.id} — {p.nome}</option>)}
             </select>
