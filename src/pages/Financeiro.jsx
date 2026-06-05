@@ -5,7 +5,7 @@ import Modal from '../components/Modal'
 import Badge from '../components/Badge'
 import { toast } from '../components/Toast'
 import { fmt, fmtDate } from '../lib/format'
-import { Plus, Search, FileDown, CheckCircle, Package } from 'lucide-react'
+import { Plus, Search, FileDown, CheckCircle, Package, Edit2 } from 'lucide-react'
 import { differenceInDays, getDaysInMonth } from 'date-fns'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -49,6 +49,31 @@ export default function Financeiro() {
     setRows(l || [])
     setContratos(c || [])
     setLoading(false)
+  }
+
+  function openNew() {
+    setForm(emptyForm)
+    setCalc(null)
+    setErrors({})
+    setModal(true)
+  }
+
+  function openEdit(row) {
+    setForm({
+      _id: row.id,
+      contrato_id: row.contrato_id,
+      periodo_inicio: row.periodo_inicio?.slice(0, 10) || '',
+      periodo_fim: row.periodo_fim?.slice(0, 10) || '',
+      e_primeiro_mes: row.e_primeiro_mes || false,
+      despesas_manutencao: String(row.despesas_manutencao || 0),
+      multa: String(row.multa || 0),
+      juros: String(row.juros || 0),
+      status_pagamento: row.status_pagamento || 'pendente',
+      data_pagamento: row.data_pagamento?.slice(0, 10) || '',
+      observacoes: row.observacoes || '',
+    })
+    setErrors({})
+    setModal(true)
   }
 
   function calcular(f = form) {
@@ -269,6 +294,8 @@ export default function Financeiro() {
     { key: 'status_pagamento', label: 'Status', render: (v) => <Badge variant={statusVariant[v]}>{v}</Badge> },
     { key: '_actions', label: '', render: (_, row) => (
       <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+        <button onClick={() => openEdit(row)} title="Editar lançamento"
+          className="p-1.5 rounded hover:bg-slate-100 text-slate-500"><Edit2 size={14} /></button>
         {row.status_pagamento !== 'pago' && (
           <button onClick={() => marcarPago(row.id)} title="Marcar pago"
             className="p-1.5 rounded hover:bg-green-50 text-green-500"><CheckCircle size={14} /></button>
@@ -299,7 +326,7 @@ export default function Financeiro() {
             className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
             <Package size={16} /> {gerandoLote ? 'Gerando...' : 'Gerar recibos do mês'}
           </button>
-          <button onClick={() => { setForm(emptyForm); setErrors({}); setCalc(null); setModal(true) }}
+          <button onClick={openNew}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
             <Plus size={16} /> Novo Lançamento
           </button>

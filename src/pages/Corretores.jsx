@@ -37,7 +37,7 @@ export default function Corretores() {
   }
 
   function openNew() { setForm(empty); setModal(true) }
-  function openEdit(row) { setForm({ ...row }); setModal(true) }
+  function openEdit(row) { setForm({ ...row, _editing: true }); setModal(true) }
 
   async function save() {
     if (!form.id.trim()) return toast('Preencha o ID do corretor.', 'error')

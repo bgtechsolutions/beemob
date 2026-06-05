@@ -59,6 +59,7 @@ export default function Proprietarios() {
     const { _editing, ...rest } = form
     const data = {
       ...rest,
+      data_nasc: rest.data_nasc || null,
       valor_aluguel: parseFloat(rest.valor_aluguel) || 0,
       valor_condominio: parseFloat(rest.valor_condominio) || 0,
       taxas_extras_cond: parseFloat(rest.taxas_extras_cond) || 0,

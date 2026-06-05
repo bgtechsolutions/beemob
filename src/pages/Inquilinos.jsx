@@ -42,7 +42,8 @@ export default function Inquilinos() {
     if (form.email && !validarEmail(form.email)) return toast('E-mail inválido.', 'error')
     setSaving(true)
     try {
-      const { _editing, ...data } = form
+      const { _editing, ...raw } = form
+      const data = { ...raw, data_nasc: raw.data_nasc || null }
       const { error } = _editing
         ? await supabase.from('inquilinos').update(data).eq('id', data.id)
         : await supabase.from('inquilinos').insert(data)

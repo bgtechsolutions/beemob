@@ -67,7 +67,7 @@ export default function Contratos() {
     if (!form.inquilino_id) return toast('Selecione o inquilino.', 'error')
     if (!validarDatas(form.data_inicio, form.data_fim)) return toast('Data fim deve ser posterior à data início.', 'error')
     setSaving(true)
-    const { _editing, ...rest } = form
+    const { _editing, proprietarios: _p, inquilinos: _i, ...rest } = form
     const data = {
       ...rest,
       valor_primeiro_aluguel: parseFloat(rest.valor_primeiro_aluguel) || 0,
