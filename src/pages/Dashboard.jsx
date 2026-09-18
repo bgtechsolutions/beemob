@@ -27,7 +27,14 @@ export default function Dashboard() {
     setLoading(true)
     setErro(null)
     try {
-      await supabase.rpc('atualizar_status_atrasado').catch(() => {})
+      // supabase.rpc() devolve um PostgrestFilterBuilder: e thenable, mas
+      // nao tem .catch(), entao o tratamento precisa ser try/catch.
+      // A rotina e opcional — se falhar, o dashboard ainda carrega.
+      try {
+        await supabase.rpc('atualizar_status_atrasado')
+      } catch {
+        // sem rotina de atraso: os status ficam como estao no banco
+      }
 
       const [imoveis, contratos, lancamentos, comissoes, caucoes] = await Promise.all([
         supabase.from('imoveis')
@@ -111,11 +118,17 @@ export default function Dashboard() {
           <StatCard title="Receita potencial/mês" value={fmt(d.receitaPotencialMes)}
             icon={TrendingUp} color="blue" sub="taxa de adm. da carteira ativa" />
           <StatCard title="Comissões a pagar" value={fmt(d.comissaoAPagar)}
-            icon={Award} color="orange"
-            sub={`${d.comissoesPendentes} lançamento${d.comissoesPendentes !== 1 ? 's' : ''}`} />
-          <StatCard title="Resultado" value={fmt(d.receitaRealizada - d.comissaoAPagar)}
-            icon={TrendingUp} color={d.receitaRealizada - d.comissaoAPagar >= 0 ? 'green' : 'red'}
-            sub="receita menos comissões" />
+            icon={Award} color="orange" sub={d.competenciaComissao} />
+          {/* Sem card de "resultado": a receita registrada é o acumulado de
+              poucos contratos ao longo de meses, e a comissão é de uma única
+              competência sobre a carteira toda. Subtrair as duas daria um
+              numero sem significado. A cobertura abaixo diz o quanto a
+              receita acima representa da carteira real. */}
+          <StatCard title="Cobertura do financeiro"
+            value={`${d.contratosComLancamento}/${d.contratosAtivos}`}
+            icon={FileText}
+            color={d.contratosComLancamento === d.contratosAtivos ? 'green' : 'orange'}
+            sub="contratos ativos com lançamento" />
         </div>
       </section>
 
@@ -251,6 +264,13 @@ function calcular({ imoveis, contratos, lancamentos, comissoes, caucoes }) {
   const comissoesPendentes = comissoes.filter(c => !c.pago)
   const comissaoAPagar = soma(comissoesPendentes, 'valor')
 
+  // As comissões vêm de uma competência específica. Deixar isso explícito
+  // evita que o valor seja lido como "total de todos os tempos".
+  const competencias = [...new Set(comissoesPendentes.map(c => c.competencia).filter(Boolean))]
+  const competenciaComissao = competencias.length === 1
+    ? `competência ${format(new Date(competencias[0] + 'T00:00:00'), 'MM/yyyy')}`
+    : `${comissoesPendentes.length} lançamentos em ${competencias.length} competências`
+
   const caucoesAtivas = caucoes.filter(c => !c.devolvido)
 
   const ocupacao = imoveis.reduce((acc, i) => {
@@ -326,7 +346,10 @@ function calcular({ imoveis, contratos, lancamentos, comissoes, caucoes }) {
     receitaRealizada,
     receitaPotencialMes,
     comissaoAPagar,
+    competenciaComissao,
     comissoesPendentes: comissoesPendentes.length,
+    contratosAtivos: ativos.length,
+    contratosComLancamento: ativos.filter(c => comLancamento.has(c.id)).length,
     caucaoCustodia: soma(caucoesAtivas, 'valor_total'),
     caucoesAtivas: caucoesAtivas.length,
     aRepassar: soma(pendentes, 'valor_repasse_proprietario'),
