@@ -1,7 +1,7 @@
 import { Outlet, NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, DollarSign, Building2,
-  Users, UserCheck, Award, Menu, LogOut
+  Users, UserCheck, Award, Menu, LogOut, ClipboardCheck
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
@@ -14,6 +14,7 @@ const nav = [
   { to: '/inquilinos', icon: Users, label: 'Inquilinos' },
   { to: '/corretores', icon: UserCheck, label: 'Corretores' },
   { to: '/comissoes', icon: Award, label: 'Comissões' },
+  { to: '/vistorias', icon: ClipboardCheck, label: 'Vistorias' },
 ]
 
 export default function Layout() {

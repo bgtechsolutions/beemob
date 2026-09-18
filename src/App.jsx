@@ -9,6 +9,7 @@ import Proprietarios from './pages/Proprietarios'
 import Inquilinos from './pages/Inquilinos'
 import Corretores from './pages/Corretores'
 import Comissoes from './pages/Comissoes'
+import Vistorias from './pages/Vistorias'
 
 function PrivateRoutes() {
   const { user, loading } = useAuth()
@@ -34,6 +35,7 @@ function PrivateRoutes() {
         <Route path="inquilinos" element={<Inquilinos />} />
         <Route path="corretores" element={<Corretores />} />
         <Route path="comissoes" element={<Comissoes />} />
+        <Route path="vistorias" element={<Vistorias />} />
       </Route>
     </Routes>
   )
